@@ -35,16 +35,16 @@ convenience.
 .. _`MediaWiki API`: http://www.mediawiki.org/wiki/API:Main_page
 """
 
-import cookielib
+import http.cookiejar
 import gzip
 try:
     import simplejson as json
 except ImportError:
     import json
 from kitchen.text.converters import to_bytes
-from StringIO import StringIO
-import urllib
-import urllib2
+from io import StringIO
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 
 __author__ = 'Ian Weller <iweller@redhat.com>'
 __version__ = '1.1'
@@ -88,16 +88,16 @@ class MediaWiki(object):
     def __init__(self, api_url, cookie_file=None, user_agent=DEFAULT_UA):
         self._api_url = api_url
         if cookie_file:
-            self._cj = cookielib.MozillaCookieJar(cookie_file)
+            self._cj = http.cookiejar.MozillaCookieJar(cookie_file)
             try:
                 self._cj.load()
             except IOError:
                 self._cj.save()
                 self._cj.load()
         else:
-            self._cj = cookielib.CookieJar()
-        self._opener = urllib2.build_opener(
-                urllib2.HTTPCookieProcessor(self._cj)
+            self._cj = http.cookiejar.CookieJar()
+        self._opener = urllib.request.build_opener(
+                urllib.request.HTTPCookieProcessor(self._cj)
         )
         self._opener.addheaders = [('User-Agent', user_agent)]
 
@@ -117,11 +117,11 @@ class MediaWiki(object):
         params['format'] = 'json'
         # urllib.urlencode expects str objects, not unicode
         fixed = dict([(to_bytes(b[0]), to_bytes(b[1]))
-                      for b in params.items()])
-        request = urllib2.Request(url, urllib.urlencode(fixed))
+                      for b in list(params.items())])
+        request = urllib.request.Request(url, urllib.parse.urlencode(fixed))
         request.add_header('Accept-encoding', 'gzip')
         response = self._opener.open(request)
-        if isinstance(self._cj, cookielib.MozillaCookieJar):
+        if isinstance(self._cj, http.cookiejar.MozillaCookieJar):
             self._cj.save()
         if response.headers.get('Content-Encoding') == 'gzip':
             compressed = StringIO(response.read())
@@ -175,9 +175,9 @@ class MediaWiki(object):
             # if there's an index.php in the URL, we might find the API
             if 'index.php' in self._api_url:
                 test_api_url = self._api_url.split('index.php')[0] + 'api.php'
-                print test_api_url
+                print(test_api_url)
                 test_data, test_data_json = tester(self, test_api_url)
-                print (test_data, test_data_json)
+                print((test_data, test_data_json))
                 if test_data_json:
                     self._api_url = test_api_url
                     return self._api_url
