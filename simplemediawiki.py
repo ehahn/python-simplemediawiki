@@ -37,11 +37,7 @@ convenience.
 
 import http.cookiejar
 import gzip
-try:
-    import simplejson as json
-except ImportError:
-    import json
-from kitchen.text.converters import to_bytes
+import json
 from io import StringIO
 import urllib.request, urllib.parse, urllib.error
 import urllib.request, urllib.error, urllib.parse
@@ -116,20 +112,21 @@ class MediaWiki(object):
         """
         params['format'] = 'json'
         # urllib.urlencode expects str objects, not unicode
-        fixed = dict([(to_bytes(b[0]), to_bytes(b[1]))
-                      for b in list(params.items())])
-        request = urllib.request.Request(url, urllib.parse.urlencode(fixed))
-        request.add_header('Accept-encoding', 'gzip')
+        paramstring = urllib.parse.urlencode(params).encode()
+        request = urllib.request.Request(url, paramstring)
+        #request.add_header('Accept-encoding', 'gzip')
         response = self._opener.open(request)
         if isinstance(self._cj, http.cookiejar.MozillaCookieJar):
             self._cj.save()
-        if response.headers.get('Content-Encoding') == 'gzip':
-            compressed = StringIO(response.read())
-            gzipper = gzip.GzipFile(fileobj=compressed)
-            data = gzipper.read()
-        else:
-            data = response.read()
-        return data
+        # FIXME: gzip doesn't work
+        #if response.headers.get('Content-Encoding') == 'gzip':
+        #    print(response.read().decode())
+        #    compressed = StringIO(response.read())
+        #    gzipper = gzip.GzipFile(fileobj=compressed)
+        #    data = gzipper.read()
+        #else:
+        data = response.read()
+        return data.decode()
 
     def call(self, params):
         """
