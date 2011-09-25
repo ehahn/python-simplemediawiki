@@ -35,12 +35,29 @@ convenience.
 .. _`MediaWiki API`: http://www.mediawiki.org/wiki/API:Main_page
 """
 
-import http.cookiejar
+try:
+    import cookielib as cookiejar
+except ImportError:
+    from http import cookiejar
 import gzip
-import json
-from io import StringIO
-import urllib.request, urllib.parse, urllib.error
-import urllib.request, urllib.error, urllib.parse
+try:
+    import simplejson as json
+except ImportError:
+    import json
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
+try:
+    from urllib import urlencode
+    import urllib2 as urequest
+    import urllib2 as uparse
+    import urllib2 as uerror
+except ImportError:
+    from urllib.parse import urlencode
+    import urllib.request as urequest
+    import urllib.parse as uparse
+    import urllib.error as uerror
 
 __author__ = 'Ian Weller <iweller@redhat.com>'
 __version__ = '1.1'
@@ -84,16 +101,16 @@ class MediaWiki(object):
     def __init__(self, api_url, cookie_file=None, user_agent=DEFAULT_UA):
         self._api_url = api_url
         if cookie_file:
-            self._cj = http.cookiejar.MozillaCookieJar(cookie_file)
+            self._cj = cookiejar.MozillaCookieJar(cookie_file)
             try:
                 self._cj.load()
             except IOError:
                 self._cj.save()
                 self._cj.load()
         else:
-            self._cj = http.cookiejar.CookieJar()
-        self._opener = urllib.request.build_opener(
-                urllib.request.HTTPCookieProcessor(self._cj)
+            self._cj = cookiejar.CookieJar()
+        self._opener = urequest.build_opener(
+                urequest.HTTPCookieProcessor(self._cj)
         )
         self._opener.addheaders = [('User-Agent', user_agent)]
 
@@ -111,21 +128,19 @@ class MediaWiki(object):
         :param params: dictionary of query string parameters
         """
         params['format'] = 'json'
-        # urllib.urlencode expects str objects, not unicode
-        paramstring = urllib.parse.urlencode(params).encode()
-        request = urllib.request.Request(url, paramstring)
-        #request.add_header('Accept-encoding', 'gzip')
+        # urllib.urlencode expects byte objects, not unicode strings
+        request = urequest.Request(url, urlencode(params).encode())
+       
+        request.add_header('Accept-encoding', 'gzip')
         response = self._opener.open(request)
-        if isinstance(self._cj, http.cookiejar.MozillaCookieJar):
+        if isinstance(self._cj, cookiejar.MozillaCookieJar):
             self._cj.save()
-        # FIXME: gzip doesn't work
-        #if response.headers.get('Content-Encoding') == 'gzip':
-        #    print(response.read().decode())
-        #    compressed = StringIO(response.read())
-        #    gzipper = gzip.GzipFile(fileobj=compressed)
-        #    data = gzipper.read()
-        #else:
-        data = response.read()
+        if response.headers.get('Content-Encoding') == 'gzip':
+            compressed = StringIO(response.read())
+            gzipper = gzip.GzipFile(fileobj=compressed)
+            data = gzipper.read()
+        else:
+            data = response.read()
         return data.decode()
 
     def call(self, params):
